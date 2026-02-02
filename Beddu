@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TalentID Store</title>
+
+<style>
+body{
+  margin:0;
+  font-family:Arial,Helvetica,sans-serif;
+  background:#0f172a;
+  color:#e5e7eb;
+}
+header{
+  background:linear-gradient(135deg,#2563eb,#06b6d4);
+  padding:24px;
+  text-align:center;
+}
+.container{padding:20px;max-width:900px;margin:auto}
+.card{
+  background:#020617;
+  border-radius:14px;
+  padding:20px;
+  margin-bottom:20px;
+  box-shadow:0 10px 25px rgba(0,0,0,.3)
+}
+h2{color:#38bdf8;margin-top:0}
+label{display:block;margin-top:10px}
+input,select,button{
+  width:100%;
+  padding:10px;
+  margin-top:6px;
+  border-radius:10px;
+  border:none;
+}
+button{
+  background:#22c55e;
+  color:#052e16;
+  font-weight:700;
+  cursor:pointer;
+}
+hr{margin:15px 0;border:1px solid #1f2937}
+.smallBtn{
+  width:auto;
+  padding:4px 8px;
+  margin-left:6px;
+  background:#ef4444;
+  color:white;
+}
+
+/* LOGIN SCREEN */
+#loginScreen{
+  position:fixed;
+  inset:0;
+  background:#020617;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+}
+#loginBox{
+  background:#0f172a;
+  padding:30px;
+  border-radius:16px;
+  width:320px;
+  text-align:center;
+}
+.loginBtn{
+  width:100%;
+  padding:12px;
+  margin-top:10px;
+  border-radius:10px;
+  border:none;
+  font-weight:700;
+  cursor:pointer;
+}
+.google{background:#ef4444;color:white}
+.facebook{background:#2563eb;color:white}
+</style>
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div id="loginBox">
+    <h2>🔐 Login TalentID</h2>
+    <button class="loginBtn google" onclick="loginGoogle()">Login Google</button>
+    <button class="loginBtn facebook" onclick="loginFacebook()">Login Facebook</button>
+  </div>
+</div>
+
+<header>
+<h1>TalentID Store</h1>
+<p>Diamond FF • TheoTown • ML</p>
+</header>
+
+<div class="container" id="mainApp" style="display:none">
+
+<!-- FORM PEMBELIAN -->
+<div class="card">
+<h2>📝 Pembelian</h2>
+
+<label>Game</label>
+<select id="game" onchange="updateForm()"></select>
+
+<div id="playerBox"></div>
+
+<label>Paket Diamond</label>
+<select id="paket" onchange="updateHarga()"></select>
+
+<p>Total: <b id="totalHarga">Rp 0</b></p>
+<button onclick="checkout()">Lanjut</button>
+</div>
+
+<!-- ADMIN PANEL -->
+<div class="card">
+<h2>🔐 Admin Panel</h2>
+
+<input type="password" id="adminPass" placeholder="Password Admin">
+<button onclick="loginAdmin()">Login</button>
+
+<div id="adminPanel" style="display:none">
+
+<hr>
+<h3>➕ Tambah Game</h3>
+<input id="newGameKey" placeholder="Kode Game (FF2)">
+<input id="newGameName" placeholder="Nama Game">
+<button onclick="addGame()">Tambah Game</button>
+
+<hr>
+<h3>💎 Tambah Paket Diamond</h3>
+<select id="adminGame"></select>
+<input id="diamondName" placeholder="Nama Paket">
+<input id="diamondPrice" type="number" placeholder="Harga">
+<button onclick="addDiamond()">Tambah Paket</button>
+
+<hr>
+<h3>📦 Semua Paket</h3>
+<div id="listPaket"></div>
+
+</div>
+</div>
+
+</div>
+
+<!-- FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+
+<script>
+// 🔥 ISI DARI FIREBASE CONSOLE
+const firebaseConfig = {
+  apiKey: "ISI_API_KEY",
+  authDomain: "ISI_AUTH_DOMAIN",
+  projectId: "ISI_PROJECT_ID",
+  appId: "ISI_APP_ID"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+
+function loginGoogle(){
+  auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+}
+function loginFacebook(){
+  auth.signInWithPopup(new firebase.auth.FacebookAuthProvider());
+}
+
+auth.onAuthStateChanged(user=>{
+  if(user){
+    loginScreen.style.display="none";
+    mainApp.style.display="block";
+  }else{
+    loginScreen.style.display="flex";
+    mainApp.style.display="none";
+  }
+});
+
+// ===== TOKO & ADMIN =====
+const ADMIN_PASS="admin123";
+let data = JSON.parse(localStorage.getItem("data")) || {
+FF:{name:"Free Fire",type:"id",paket:[["100 Diamond",15000],["310 Diamond",45000]]},
+TT:{name:"TheoTown",type:"acc",paket:[["100 Diamond",10000],["300 Diamond",28000]]},
+ML:{name:"Mobile Legends",type:"id",paket:[["86 Diamond",20000],["172 Diamond",38000]]}
+};
+
+function save(){localStorage.setItem("data",JSON.stringify(data));render();}
+
+function render(){
+game.innerHTML='<option value="">-- Pilih Game --</option>';
+adminGame.innerHTML="";
+for(let k in data){
+game.innerHTML+=`<option value="${k}">${data[k].name}</option>`;
+adminGame.innerHTML+=`<option value="${k}">${data[k].name}</option>`;
+}
+renderList();
+}
+
+function updateForm(){
+playerBox.innerHTML="";
+paket.innerHTML='<option value="">-- Pilih Paket --</option>';
+let g=game.value;
+if(!g)return;
+
+if(data[g].type==="acc"){
+playerBox.innerHTML=`<label>Account</label><input id="account"><label>Password</label><input type="password" id="password">`;
+}else{
+playerBox.innerHTML=`<label>ID Player</label><input id="idplayer">`;
+}
+
+data[g].paket.forEach(p=>{
+paket.innerHTML+=`<option value="${p[1]}">${p[0]}</option>`;
+});
+updateHarga();
+}
+
+function updateHarga(){
+totalHarga.innerText="Rp "+Number(paket.value||0).toLocaleString("id-ID");
+}
+function checkout(){alert("Lanjut ke pembayaran");}
+function loginAdmin(){
+if(adminPass.value===ADMIN_PASS) adminPanel.style.display="block";
+else alert("Password salah");
+}
+function addGame(){
+let k=newGameKey.value.toUpperCase();
+if(data[k])return alert("Game sudah ada");
+data[k]={name:newGameName.value,type:"id",paket:[]};
+save();
+}
+function addDiamond(){
+data[adminGame.value].paket.push([diamondName.value,Number(diamondPrice.value)]);
+save();
+}
+function renderList(){
+listPaket.innerHTML="";
+for(let g in data){
+listPaket.innerHTML+=`<b>${data[g].name}</b><br>`;
+data[g].paket.forEach((p,i)=>{
+listPaket.innerHTML+=`${p[0]} - Rp ${p[1].toLocaleString("id-ID")}
+<button class="smallBtn" onclick="del('${g}',${i})">X</button><br>`;
+});
+}
+}
+function del(g,i){data[g].paket.splice(i,1);save();}
+render();
+</script>
+
+</body>
+</html>
